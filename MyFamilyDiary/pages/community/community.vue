@@ -17,7 +17,7 @@ onShow(() => {
 function checkLogin() {
   const token = uni.getStorageSync('token')
   if (!token) {
-    uni.reLaunch({ url: '/pages/login/login' })
+    uni.reLaunch({ url: '/pages/auth/login' })
   }
 }
 </script>

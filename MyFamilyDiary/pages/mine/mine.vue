@@ -51,14 +51,14 @@
 <script setup>
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { uploadAvatar } from '@/api/cos'
+import { uploadAvatar, getAvatarUrl } from '@/api/cos'
 
 // 响应式状态
 const userInfo = ref(null)
 const uploading = ref(false)
 
 // 使用 onShow 而不是 onLoad，因为 tabBar 页面切换时只触发 onShow
-onShow(() => {
+onShow(async () => {
   // Check login status
   const token = uni.getStorageSync('token')
   if (!token) {
@@ -68,6 +68,19 @@ onShow(() => {
 
   // Get user info
   userInfo.value = uni.getStorageSync('userInfo') || {}
+
+  // 刷新头像URL（URL有24小时过期时间，需要定期刷新）
+  if (userInfo.value.openId) {
+    try {
+      const res = await getAvatarUrl(userInfo.value.openId)
+      if (res.data) {
+        userInfo.value.avatarUrl = res.data
+        uni.setStorageSync('userInfo', userInfo.value)
+      }
+    } catch (e) {
+      console.log('刷新头像URL失败', e)
+    }
+  }
 })
 
 // 预览头像大图
@@ -213,7 +226,7 @@ function handleLogout() {
 
 function navigateToLogin() {
   uni.reLaunch({
-    url: '/pages/login/login'
+    url: '/pages/auth/login'
   })
 }
 </script>

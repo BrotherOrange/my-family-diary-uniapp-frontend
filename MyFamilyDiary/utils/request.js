@@ -50,7 +50,7 @@ export function request(options) {
           })
           setTimeout(() => {
             uni.reLaunch({
-              url: '/pages/login/login'
+              url: '/pages/auth/login'
             })
           }, 1500)
           reject({ message: '登录已过期' })
