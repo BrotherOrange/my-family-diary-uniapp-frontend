@@ -213,7 +213,7 @@ function handleLogout() {
 
 function navigateToLogin() {
   uni.reLaunch({
-    url: '/pages/login/login'
+    url: '/pages/auth/login'
   })
 }
 </script>
