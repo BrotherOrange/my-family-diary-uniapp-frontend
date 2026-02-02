@@ -40,6 +40,23 @@ export function request(options) {
       data: options.data,
       header,
       success: (res) => {
+        // 处理 token 过期或无效（401 Unauthorized）
+        if (res.statusCode === 401) {
+          uni.removeStorageSync('token')
+          uni.removeStorageSync('userInfo')
+          uni.showToast({
+            title: '登录已过期，请重新登录',
+            icon: 'none'
+          })
+          setTimeout(() => {
+            uni.reLaunch({
+              url: '/pages/login/login'
+            })
+          }, 1500)
+          reject({ message: '登录已过期' })
+          return
+        }
+
         if (res.statusCode === 200 && res.data.success) {
           resolve(res.data)
         } else {
