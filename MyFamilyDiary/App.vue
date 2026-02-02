@@ -21,10 +21,10 @@ function checkLoginStatus() {
   const currentPage = pages.length > 0 ? pages[pages.length - 1] : null
   const currentPath = currentPage ? currentPage.route : ''
 
-  // 如果当前不在登录页，且没有 token，则跳转到登录页
-  if (!token && currentPath !== 'pages/login/login') {
+  // 如果当前不在认证页面，且没有 token，则跳转到登录页
+  if (!token && !currentPath.startsWith('pages/auth/')) {
     uni.reLaunch({
-      url: '/pages/login/login'
+      url: '/pages/auth/login'
     })
   }
 }

@@ -19,10 +19,17 @@
       }
     },
     {
-      "path": "pages/login/login",
+      "path": "pages/auth/login",
       "style": {
         "navigationStyle": "custom",
         "navigationBarTitleText": "登录"
+      }
+    },
+    {
+      "path": "pages/auth/register",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "注册"
       }
     }
   ],
