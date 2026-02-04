@@ -52,6 +52,7 @@
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { uploadAvatar, getAvatarUrl } from '@/api/cos'
+import { logout } from '@/api/auth'
 
 // 响应式状态
 const userInfo = ref(null)
@@ -59,9 +60,10 @@ const uploading = ref(false)
 
 // 使用 onShow 而不是 onLoad，因为 tabBar 页面切换时只触发 onShow
 onShow(async () => {
-  // Check login status
-  const token = uni.getStorageSync('token')
-  if (!token) {
+  // Check login status (支持新旧token字段)
+  const accessToken = uni.getStorageSync('accessToken')
+  const legacyToken = uni.getStorageSync('token')
+  if (!accessToken && !legacyToken) {
     navigateToLogin()
     return
   }
@@ -214,10 +216,21 @@ function handleLogout() {
     content: '确定要退出登录吗？',
     confirmText: '确定',
     cancelText: '取消',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        uni.removeStorageSync('token')
+        try {
+          // 调用后端登出接口，使Token失效
+          await logout()
+        } catch (e) {
+          // 即使接口失败也继续清除本地数据
+          console.log('登出接口调用失败', e)
+        }
+        // 清除本地存储
+        uni.removeStorageSync('accessToken')
+        uni.removeStorageSync('refreshToken')
         uni.removeStorageSync('userInfo')
+        // 兼容旧的token字段
+        uni.removeStorageSync('token')
         navigateToLogin()
       }
     }

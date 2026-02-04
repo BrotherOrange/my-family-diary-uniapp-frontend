@@ -92,3 +92,31 @@ export function checkUserExists(openId) {
     data: { openId }
   })
 }
+
+/**
+ * User logout
+ * Invalidates all tokens for the current user
+ * @returns {Promise<void>}
+ */
+export function logout() {
+  return request({
+    url: '/v1/logout',
+    method: 'POST',
+    auth: true
+  })
+}
+
+/**
+ * Refresh token
+ * Use refresh token to get new access token and refresh token
+ * @param {string} refreshToken - Refresh Token
+ * @returns {Promise<{accessToken: string, refreshToken: string}>}
+ */
+export function refreshToken(refreshToken) {
+  return request({
+    url: '/v1/token/refresh',
+    method: 'POST',
+    data: { refreshToken },
+    skipAutoRefresh: true  // 避免刷新接口本身触发自动刷新
+  })
+}
