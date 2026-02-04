@@ -16,13 +16,17 @@ onHide(() => {
 
 // 检查登录状态
 function checkLoginStatus() {
-  const token = uni.getStorageSync('token')
+  // 支持新的 accessToken 和旧的 token 字段
+  const accessToken = uni.getStorageSync('accessToken')
+  const legacyToken = uni.getStorageSync('token')
+  const hasToken = accessToken || legacyToken
+
   const pages = getCurrentPages()
   const currentPage = pages.length > 0 ? pages[pages.length - 1] : null
   const currentPath = currentPage ? currentPage.route : ''
 
   // 如果当前不在认证页面，且没有 token，则跳转到登录页
-  if (!token && !currentPath.startsWith('pages/auth/')) {
+  if (!hasToken && !currentPath.startsWith('pages/auth/')) {
     uni.reLaunch({
       url: '/pages/auth/login'
     })

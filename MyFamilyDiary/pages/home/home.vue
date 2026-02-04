@@ -15,8 +15,10 @@ onShow(() => {
 })
 
 function checkLogin() {
-  const token = uni.getStorageSync('token')
-  if (!token) {
+  // 支持新的 accessToken 和旧的 token 字段
+  const accessToken = uni.getStorageSync('accessToken')
+  const legacyToken = uni.getStorageSync('token')
+  if (!accessToken && !legacyToken) {
     uni.reLaunch({ url: '/pages/auth/login' })
   }
 }

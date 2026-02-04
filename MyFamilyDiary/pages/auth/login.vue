@@ -60,8 +60,10 @@ const pageLoading = ref(true)
 const initError = ref('')
 
 onLoad(() => {
-  const token = uni.getStorageSync('token')
-  if (token) {
+  // 检查是否已登录（支持新旧token字段）
+  const accessToken = uni.getStorageSync('accessToken')
+  const legacyToken = uni.getStorageSync('token')
+  if (accessToken || legacyToken) {
     navigateToHome()
     return
   }
@@ -146,8 +148,20 @@ async function handleLogin() {
   loading.value = true
   try {
     const res = await login(openId.value, password.value)
-    uni.setStorageSync('token', res.data.token)
-    uni.setStorageSync('userInfo', res.data)
+    // 保存双Token
+    uni.setStorageSync('accessToken', res.data.accessToken)
+    uni.setStorageSync('refreshToken', res.data.refreshToken)
+    // 保存用户信息（不包含token）
+    const userInfo = {
+      openId: res.data.openId,
+      username: res.data.username,
+      phone: res.data.phone,
+      description: res.data.description,
+      birthday: res.data.birthday,
+      status: res.data.status,
+      avatarUrl: res.data.avatarUrl
+    }
+    uni.setStorageSync('userInfo', userInfo)
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {
       navigateToHome()
