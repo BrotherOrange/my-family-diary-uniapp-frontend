@@ -2,7 +2,7 @@
   <view class="container">
     <view class="user-card" v-if="userInfo">
       <view class="avatar-container" @tap="previewAvatar">
-        <image class="avatar" :src="userInfo.avatarUrl || '/static/logo.png'" mode="aspectFill"></image>
+        <image class="avatar" :src="userInfo.avatarUrl || '/static/logo.png'" mode="aspectFill" @error="onAvatarError"></image>
         <!-- #ifdef MP-WEIXIN -->
         <button
           class="avatar-change-btn"
@@ -57,6 +57,31 @@ import { logout } from '@/api/auth'
 // 响应式状态
 const userInfo = ref(null)
 const uploading = ref(false)
+let avatarRetrying = false
+let lastAvatarRetryUrl = ''
+
+async function refreshAvatarUrl(options = {}) {
+  if (!userInfo.value || !userInfo.value.openId) {
+    if (options.fromError) {
+      avatarRetrying = false
+    }
+    return
+  }
+
+  try {
+    const res = await getAvatarUrl(userInfo.value.openId)
+    if (res.data) {
+      userInfo.value.avatarUrl = res.data
+      uni.setStorageSync('userInfo', userInfo.value)
+    }
+  } catch (e) {
+    console.log('刷新头像URL失败', e)
+  } finally {
+    if (options.fromError) {
+      avatarRetrying = false
+    }
+  }
+}
 
 // 使用 onShow 而不是 onLoad，因为 tabBar 页面切换时只触发 onShow
 onShow(async () => {
@@ -72,17 +97,7 @@ onShow(async () => {
   userInfo.value = uni.getStorageSync('userInfo') || {}
 
   // 刷新头像URL（URL有24小时过期时间，需要定期刷新）
-  if (userInfo.value.openId) {
-    try {
-      const res = await getAvatarUrl(userInfo.value.openId)
-      if (res.data) {
-        userInfo.value.avatarUrl = res.data
-        uni.setStorageSync('userInfo', userInfo.value)
-      }
-    } catch (e) {
-      console.log('刷新头像URL失败', e)
-    }
-  }
+  await refreshAvatarUrl()
 })
 
 // 预览头像大图
@@ -97,6 +112,22 @@ function previewAvatar() {
     current: avatarUrl,
     urls: [avatarUrl]
   })
+}
+
+function onAvatarError() {
+  if (!userInfo.value || !userInfo.value.openId) {
+    return
+  }
+  const avatarUrl = userInfo.value.avatarUrl || ''
+  if (!avatarUrl || avatarUrl.startsWith('/static/')) {
+    return
+  }
+  if (avatarRetrying || avatarUrl === lastAvatarRetryUrl) {
+    return
+  }
+  avatarRetrying = true
+  lastAvatarRetryUrl = avatarUrl
+  refreshAvatarUrl({ fromError: true })
 }
 
 // 微信头像选择回调

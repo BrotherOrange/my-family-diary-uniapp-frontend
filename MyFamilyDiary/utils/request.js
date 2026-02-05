@@ -119,116 +119,98 @@ export function request(options) {
     const legacyToken = uni.getStorageSync('token')
     const token = accessToken || legacyToken
 
-    const header = {
+    const traceId = generateTraceId()
+    const baseHeader = {
       'Content-Type': 'application/json',
-      'x-trace-id': generateTraceId()
+      'x-trace-id': traceId,
+      ...(options.header || {})
     }
 
-    if (options.auth && token) {
-      header['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`
+    const buildHeader = (tokenValue) => {
+      const header = { ...baseHeader }
+      if (options.auth && tokenValue) {
+        header['Authorization'] = tokenValue.startsWith('Bearer ') ? tokenValue : `Bearer ${tokenValue}`
+      }
+      return header
     }
 
-    uni.request({
-      url: BASE_URL + options.url,
-      method: options.method || 'GET',
-      data: options.data,
-      header,
-      success: async (res) => {
-        // 处理 token 过期（401 Unauthorized）
-        if (res.statusCode === 401) {
-          // 如果是刷新Token接口本身返回401，直接跳转登录
-          if (options.skipAutoRefresh) {
-            handleTokenExpired()
-            reject({ message: '登录已过期' })
+    const sendRequest = (tokenValue, allowRefresh) => {
+      const header = buildHeader(tokenValue)
+      uni.request({
+        url: BASE_URL + options.url,
+        method: options.method || 'GET',
+        data: options.data,
+        header,
+        success: async (res) => {
+          // 处理 token 过期（401 Unauthorized）
+          if (res.statusCode === 401) {
+            // 如果是刷新Token接口本身返回401，直接跳转登录
+            if (options.skipAutoRefresh || !allowRefresh) {
+              handleTokenExpired()
+              reject({ message: '登录已过期' })
+              return
+            }
+
+            // 尝试刷新Token
+            if (!isRefreshing) {
+              isRefreshing = true
+
+              try {
+                const newAccessToken = await doRefreshToken()
+                isRefreshing = false
+                onTokenRefreshed(newAccessToken)
+
+                // 重试当前请求（只重试一次）
+                sendRequest(newAccessToken, false)
+              } catch (refreshError) {
+                isRefreshing = false
+                onRefreshFailed(refreshError)
+                handleTokenExpired()
+                reject({ message: '登录已过期' })
+              }
+            } else {
+              // 已经在刷新中，等待刷新完成后重试
+              subscribeTokenRefresh((newAccessToken, error) => {
+                if (error) {
+                  reject({ message: '登录已过期' })
+                  return
+                }
+
+                // 重试当前请求（只重试一次）
+                sendRequest(newAccessToken, false)
+              })
+            }
             return
           }
 
-          // 尝试刷新Token
-          if (!isRefreshing) {
-            isRefreshing = true
-
-            try {
-              const newAccessToken = await doRefreshToken()
-              isRefreshing = false
-              onTokenRefreshed(newAccessToken)
-
-              // 重试当前请求
-              header['Authorization'] = `Bearer ${newAccessToken}`
-              uni.request({
-                url: BASE_URL + options.url,
-                method: options.method || 'GET',
-                data: options.data,
-                header,
-                success: (retryRes) => {
-                  if (retryRes.statusCode === 200 && retryRes.data.success) {
-                    resolve(retryRes.data)
-                  } else {
-                    handleRequestError(retryRes, reject)
-                  }
-                },
-                fail: (err) => {
-                  uni.showToast({
-                    title: '网络错误，请检查网络连接',
-                    icon: 'none'
-                  })
-                  reject(err)
-                }
-              })
-            } catch (refreshError) {
-              isRefreshing = false
-              onRefreshFailed(refreshError)
-              handleTokenExpired()
-              reject({ message: '登录已过期' })
-            }
+          if (res.statusCode === 200 && res.data.success) {
+            resolve(res.data)
           } else {
-            // 已经在刷新中，等待刷新完成后重试
-            subscribeTokenRefresh((newAccessToken, error) => {
-              if (error) {
-                reject({ message: '登录已过期' })
-                return
-              }
-
-              // 重试当前请求
-              header['Authorization'] = `Bearer ${newAccessToken}`
-              uni.request({
-                url: BASE_URL + options.url,
-                method: options.method || 'GET',
-                data: options.data,
-                header,
-                success: (retryRes) => {
-                  if (retryRes.statusCode === 200 && retryRes.data.success) {
-                    resolve(retryRes.data)
-                  } else {
-                    handleRequestError(retryRes, reject)
-                  }
-                },
-                fail: (err) => {
-                  uni.showToast({
-                    title: '网络错误，请检查网络连接',
-                    icon: 'none'
-                  })
-                  reject(err)
-                }
-              })
-            })
+            handleRequestError(res, reject)
           }
+        },
+        fail: (err) => {
+          uni.showToast({
+            title: '网络错误，请检查网络连接',
+            icon: 'none'
+          })
+          reject(err)
+        }
+      })
+    }
+
+    if (options.auth && isRefreshing) {
+      subscribeTokenRefresh((newAccessToken, error) => {
+        if (error) {
+          reject({ message: '登录已过期' })
           return
         }
+        sendRequest(newAccessToken, false)
+      })
+      return
+    }
 
-        if (res.statusCode === 200 && res.data.success) {
-          resolve(res.data)
-        } else {
-          handleRequestError(res, reject)
-        }
-      },
-      fail: (err) => {
-        uni.showToast({
-          title: '网络错误，请检查网络连接',
-          icon: 'none'
-        })
-        reject(err)
-      }
-    })
+    sendRequest(token, true)
   })
 }
 
